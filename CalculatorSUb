@@ -1,0 +1,187 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[1]:
+
+
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont, QDoubleValidator, QIntValidator, QIcon
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QLineEdit, QPushButton, QMessageBox
+import math
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_qt5agg import FigureCanvas 
+import sys
+
+class Calculator(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.userinterface()
+        self.setWindowIcon(QIcon('speakericon.png'))
+    def userinterface(self):
+        self.setWindowTitle('Sealed Subwoofer Enclosure Calculator')
+        self.setGeometry(100, 100, 400, 400)
+        self.dataIO()
+        self.show()
+   
+    
+    def dataIO(self):
+        
+        validator = QDoubleValidator(0.0, 250.0, 3)
+        intvalidator = QIntValidator(0, 99999)
+        
+        vastext = QLabel('Vas (lts) :', self)
+        vastext.move(20, 50)
+        vastext.setFont(QFont('Arial', 10))
+        
+        self.vasinput = QLineEdit(self)
+        self.vasinput.move(80, 50)
+        self.vasinput.resize(60, 15)
+        self.vasinput.setValidator(intvalidator)
+        
+        qtstext = QLabel('Qts:', self)
+        qtstext.move(20, 80)
+        qtstext.setFont(QFont('Arial', 10))
+        
+        self.qtsinput = QLineEdit(self)
+        self.qtsinput.move(80, 80)
+        self.qtsinput.resize(60, 15)
+        self.qtsinput.setValidator(validator)
+        
+        fstext = QLabel('Fs (hz) :', self)
+        fstext.move(20, 110)
+        fstext.setFont(QFont('Arial', 10))
+        
+        self.fsinput = QLineEdit(self)
+        self.fsinput.move(80, 110)
+        self.fsinput.resize(60, 15)
+        self.fsinput.setValidator(intvalidator)
+        
+        qtctext = QLabel('Qtc:', self)
+        qtctext.move(20, 140)
+        qtctext.setFont(QFont('Arial', 10))
+        
+        self.qtcinput = QLineEdit(self)
+        self.qtcinput.move(80, 140)
+        self.qtcinput.resize(60, 15)
+        self.qtcinput.setValidator(validator)
+        
+        voltext = QLabel('Enclosure Volume (lts) :', self)
+        voltext.move(155, 50)
+        voltext.setFont(QFont('Arial', 10))
+        
+        calcbutton = QPushButton('Calculate Volume/ \n Display Transfer Function', self)
+        calcbutton.move(120, 200)
+        calcbutton.resize(150, 45)
+        calcbutton.setStyleSheet('background-color: #d5e4f0;'
+                                'color: black;'
+                                'border-style: solid;'
+                                'border-width: 3px;'
+                                'border-color: #d5e4f0;'
+                                'border-radius: 4px'
+                                )
+        
+        self.volresult = QLineEdit(self)
+        self.volresult.move(300, 50)
+        self.volresult.resize(60, 15)
+        self.volresult.setReadOnly(True)
+        self.volresult.setMaxLength(7)
+       
+        calcbutton.clicked.connect(self.volumecalc)
+        
+        self.nozeros = QMessageBox(self)
+        self.nozeros.setIcon(QMessageBox.Warning)
+        self.nozeros.setWindowTitle('Value Input Error')
+        self.nozeros.setText('Values cannot be empty or zero. Qtc must be greater than Qts.')
+        self.nozeros.setStandardButtons(QMessageBox.Ok)
+        
+        f3text = QLabel('-3dB Frequency (hz) :', self)
+        f3text.move(155, 80)
+        f3text.setFont(QFont('Arial', 10))
+        
+        self.f3result = QLineEdit(self)
+        self.f3result.move(300, 80)
+        self.f3result.resize(60,15)
+        self.f3result.setReadOnly(True)
+        self.f3result.setMaxLength(5)
+        
+        
+        
+    def volumecalc(self):
+        qts = self.qtsinput.text()
+        vas = self.vasinput.text()
+        fs = self.fsinput.text()
+        qtc = self.qtcinput.text()
+        
+        list = [qts, vas, fs, qtc]
+        list2 = [len(item) for item in list]
+        
+        if 0 in list2:
+            self.nozeros.show()
+            return
+        
+        qts = str(qts.replace(",", '.'))
+        vas = int(vas)
+        fs = int(fs)
+        qtc = str(qtc.replace(",", '.'))
+        qts = float(qts)
+        qtc = float(qtc)
+        list2 = [qts, vas, fs, qtc]
+        
+        
+       
+        if 0 not in list2 and (qtc/qts)**2 > 1:
+                alpha = (qtc/qts)**2 - 1
+                vb = vas/alpha
+                fc = int((qtc*fs)/qts)
+                vbstr = str('%.2f' % vb)
+                self.volresult.setText(vbstr)
+                
+        else:
+            self.nozeros.show()
+        
+        def closedboxtfcalc(f):
+            return 10*(math.log(((f/fs)**4)/(((1 + vas/vb) - ((f/fs)**2))**2 + ((1/qts)*(f/fs))**2)))
+
+        thisbox = [closedboxtfcalc(f) for f in range(1, 250)]
+        
+        
+        
+        
+        canvas = FigureCanvas(plt.figure(figsize=(12, 5)))
+        xticks = np.arange(0, 250, 10)
+        yticks = np.arange(-18, 18, 3)
+        plt.xticks(xticks)
+        plt.yticks(yticks)
+        plt.xlim(10, 250)
+        plt.ylim(-18, 20)
+        plt.grid()
+        plt.plot(np.arange(1, 250), thisbox)
+        
+        
+            
+        canvas.show()
+        
+        def f3finder():
+            templist = []
+            for item in thisbox:
+                if int(item) == -3:
+                    templist.append(item)
+            return thisbox.index(templist[-1])
+        
+        f3 = f3finder()
+        f3 = str(f3)
+        self.f3result.setText(f3)
+        
+    
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    window = Calculator()
+    sys.exit(app.exec_())
+
+
+# In[ ]:
+
+
+
+
